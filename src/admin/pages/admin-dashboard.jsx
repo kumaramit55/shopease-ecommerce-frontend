@@ -5,6 +5,7 @@ import useProducts from "../products/useProducts";
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { products } = useProducts();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 850);
 
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -13,16 +14,16 @@ const AdminDashboard = () => {
     revenue: 0,
   });
 
-  const adminName = "Admin"; // later auth se aayega
+  const adminName = "Admin";
 
-  /* ================= LOAD DASHBOARD STATS ================= */
   useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem("app_orders")) || [];
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
+    window.addEventListener("resize", handleResize);
 
+    const orders = JSON.parse(localStorage.getItem("app_orders")) || [];
     const pendingOrders = orders.filter(
       (order) => order.status !== "DELIVERED" && order.status !== "CANCELLED",
     );
-
     const revenue = orders
       .filter((order) => order.status === "DELIVERED")
       .reduce((sum, order) => sum + order.totalAmount, 0);
@@ -33,173 +34,308 @@ const AdminDashboard = () => {
       pendingOrders: pendingOrders.length,
       revenue,
     });
+
+    return () => window.removeEventListener("resize", handleResize);
   }, [products]);
 
-  /* ================= LOGOUT ================= */
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("auth_token"); // Better than clear() which wipes product data
     navigate("/login", { replace: true });
   };
 
   return (
     <div style={styles.page}>
-      {/* HEADER */}
-      <header style={styles.header}>
-        <h2>Admin Dashboard</h2>
-
-        <button style={styles.logoutBtn} onClick={handleLogout}>
-          Logout
-        </button>
-      </header>
-
-      {/* CONTENT */}
-      <div style={styles.container}>
-        <h3 style={styles.welcome}>Welcome back, {adminName} 👋</h3>
-
-        {/* STATS */}
-        <div style={styles.grid}>
-          <div style={styles.card} onClick={() => navigate("/admin/products")}>
-            <p style={styles.cardTitle}>Total Products</p>
-            <h2 style={styles.cardValue}>{stats.totalProducts}</h2>
-            <span style={styles.viewText}>View details →</span>
+      {/* SIDEBAR - Desktop Only */}
+      {!isMobile && (
+        <aside style={styles.sidebar}>
+          <div style={styles.sidebarBrand}>
+            ShopEase <span>Pro</span>
           </div>
-
-          <div style={styles.card} onClick={() => navigate("/admin/orders")}>
-            <p style={styles.cardTitle}>Total Orders</p>
-            <h2 style={styles.cardValue}>{stats.totalOrders}</h2>
-            <span style={styles.viewText}>View details →</span>
-          </div>
-
-          <div style={styles.card} onClick={() => navigate("/admin/orders")}>
-            <p style={styles.cardTitle}>Pending Orders</p>
-            <h2 style={styles.cardValue}>{stats.pendingOrders}</h2>
-            <span style={styles.viewText}>View details →</span>
-          </div>
-
-          <div style={styles.card}>
-            <p style={styles.cardTitle}>Revenue</p>
-            <h2 style={styles.cardValue}>₹ {stats.revenue.toFixed(2)}</h2>
-          </div>
-        </div>
-
-        {/* QUICK ACTIONS */}
-        <div style={styles.quickActions}>
-          <h4>Quick Actions</h4>
-
-          <div style={styles.actionsRow}>
-            <button
-              style={styles.actionBtn}
-              onClick={() => navigate("/admin/products/add")}>
-              Add Product
-            </button>
-
-            <button
-              style={styles.actionBtn}
+          <nav style={styles.sidebarNav}>
+            <div style={styles.activeNavItem}>🏠 Dashboard</div>
+            <div
+              style={styles.navItem}
+              onClick={() => navigate("/admin/products")}>
+              📦 Products
+            </div>
+            <div
+              style={styles.navItem}
               onClick={() => navigate("/admin/orders")}>
-              View Orders
-            </button>
+              🛒 Orders
+            </div>
+            <div style={styles.navItem}>📊 Analytics</div>
+            <div style={styles.navItem}>⚙️ Settings</div>
+          </nav>
+          <button style={styles.logoutBtn} onClick={handleLogout}>
+            Logout
+          </button>
+        </aside>
+      )}
+
+      {/* MAIN CONTENT AREA */}
+      <main style={{ ...styles.main, marginLeft: isMobile ? 0 : "260px" }}>
+        {/* TOP BAR */}
+        <header style={styles.topBar}>
+          <div>
+            <h2 style={styles.pageTitle}>Dashboard Overview</h2>
+            <p style={styles.dateText}>
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
           </div>
+          <div style={styles.profileArea}>
+            <div style={styles.avatar}>{adminName[0]}</div>
+            <span>{adminName}</span>
+          </div>
+        </header>
+
+        <div style={styles.contentContainer}>
+          <h3 style={styles.welcomeText}>Welcome back, {adminName} 👋</h3>
+
+          {/* STATS GRID */}
+          <div style={styles.grid}>
+            <StatCard
+              label="Products"
+              value={stats.totalProducts}
+              icon="🏷️"
+              color="#4338ca"
+              onClick={() => navigate("/admin/products")}
+            />
+            <StatCard
+              label="Total Orders"
+              value={stats.totalOrders}
+              icon="🛍️"
+              color="#10b981"
+              onClick={() => navigate("/admin/orders")}
+            />
+            <StatCard
+              label="Pending"
+              value={stats.pendingOrders}
+              icon="⏳"
+              color="#f59e0b"
+              onClick={() => navigate("/admin/orders")}
+            />
+            <StatCard
+              label="Revenue"
+              value={`₹${Math.round(stats.revenue)}`}
+              icon="💰"
+              color="#6366f1"
+            />
+          </div>
+
+          {/* QUICK ACTIONS SECTION */}
+          <section style={styles.actionsCard}>
+            <h4 style={styles.sectionTitle}>Management Shortcuts</h4>
+            <div style={styles.actionsRow}>
+              <button
+                style={styles.primaryAction}
+                onClick={() => navigate("/admin/products/add")}>
+                ➕ Add New Product
+              </button>
+              <button
+                style={styles.secondaryAction}
+                onClick={() => navigate("/admin/orders")}>
+                📋 Process Orders
+              </button>
+              <button style={styles.secondaryAction}>
+                📩 Customer Support
+              </button>
+            </div>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
 
-export default AdminDashboard;
+/* REUSABLE STAT CARD COMPONENT */
+const StatCard = ({ label, value, icon, color, onClick }) => (
+  <div
+    style={{ ...styles.card, cursor: onClick ? "pointer" : "default" }}
+    onClick={onClick}
+    onMouseEnter={(e) =>
+      onClick && (e.currentTarget.style.transform = "translateY(-5px)")
+    }
+    onMouseLeave={(e) =>
+      onClick && (e.currentTarget.style.transform = "translateY(0)")
+    }>
+    <div
+      style={{ ...styles.iconCircle, background: `${color}15`, color: color }}>
+      {icon}
+    </div>
+    <div style={styles.cardContent}>
+      <p style={styles.cardLabel}>{label}</p>
+      <h2 style={styles.cardValue}>{value}</h2>
+    </div>
+  </div>
+);
 
-/* ================= STYLES ================= */
+/* ================= THEMED ADMIN STYLES ================= */
 
 const styles = {
   page: {
+    background: "#f8fafc",
     minHeight: "100vh",
-    background: "#f4f6f8",
-    fontFamily: "system-ui, sans-serif",
+    display: "flex",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
   },
 
-  header: {
-    height: 64,
-    background: "#111",
+  /* SIDEBAR */
+  sidebar: {
+    width: "260px",
+    background: "#1e293b",
     color: "#fff",
-    padding: "0 24px",
+    position: "fixed",
+    top: 0,
+    bottom: 0,
+    padding: "32px 20px",
+    display: "flex",
+    flexDirection: "column",
+  },
+  sidebarBrand: {
+    fontSize: "22px",
+    fontWeight: 800,
+    marginBottom: "40px",
+    paddingLeft: "10px",
+  },
+  sidebarNav: { flex: 1, display: "flex", flexDirection: "column", gap: "8px" },
+  navItem: {
+    padding: "12px 16px",
+    borderRadius: "12px",
+    color: "#94a3b8",
+    cursor: "pointer",
+    transition: "0.2s",
+    fontWeight: 600,
+  },
+  activeNavItem: {
+    padding: "12px 16px",
+    borderRadius: "12px",
+    background: "#334155",
+    color: "#fff",
+    fontWeight: 700,
+  },
+  logoutBtn: {
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    padding: "14px",
+    borderRadius: "12px",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+
+  /* MAIN CONTENT */
+  main: { flex: 1, transition: "margin 0.3s" },
+  topBar: {
+    height: "80px",
+    background: "#fff",
+    borderBottom: "1px solid #e2e8f0",
+    padding: "0 40px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
-  logoutBtn: {
-    background: "#e63946",
+  pageTitle: { fontSize: "20px", fontWeight: 800, color: "#1e293b", margin: 0 },
+  dateText: { fontSize: "12px", color: "#94a3b8", margin: "2px 0 0" },
+  profileArea: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    fontWeight: 700,
+    color: "#334155",
+  },
+  avatar: {
+    width: "36px",
+    height: "36px",
+    background: "#4338ca",
     color: "#fff",
-    border: "none",
-    padding: "6px 14px",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontWeight: 600,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  container: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: 24,
+  contentContainer: { padding: "40px" },
+  welcomeText: {
+    fontSize: "24px",
+    fontWeight: 800,
+    color: "#1e293b",
+    marginBottom: "32px",
   },
 
-  welcome: {
-    marginBottom: 20,
-  },
-
+  /* STATS */
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 20,
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "24px",
   },
-
   card: {
     background: "#fff",
-    padding: 24,
-    borderRadius: 12,
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-    transition: "transform 0.2s, box-shadow 0.2s",
-  },
-
-  cardTitle: {
-    color: "#555",
-    marginBottom: 6,
-  },
-
-  cardValue: {
-    margin: 0,
-  },
-
-  viewText: {
-    marginTop: 10,
-    display: "inline-block",
-    color: "#1d2671",
-    fontWeight: 600,
-    fontSize: 13,
-  },
-
-  quickActions: {
-    marginTop: 40,
-    background: "#fff",
-    padding: 24,
-    borderRadius: 12,
-    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-  },
-
-  actionsRow: {
-    marginTop: 16,
+    padding: "24px",
+    borderRadius: "24px",
     display: "flex",
-    gap: 16,
-    flexWrap: "wrap",
+    gap: "20px",
+    alignItems: "center",
+    border: "1px solid #f1f5f9",
+    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+    transition: "0.3s",
+  },
+  iconCircle: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "24px",
+  },
+  cardLabel: { fontSize: "14px", fontWeight: 700, color: "#64748b", margin: 0 },
+  cardValue: {
+    fontSize: "24px",
+    fontWeight: 800,
+    color: "#1e293b",
+    margin: "4px 0 0",
   },
 
-  actionBtn: {
-    padding: "10px 20px",
-    background: "#1d2671",
+  /* QUICK ACTIONS */
+  actionsCard: {
+    marginTop: "40px",
+    background: "#fff",
+    padding: "32px",
+    borderRadius: "24px",
+    border: "1px solid #f1f5f9",
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.04)",
+  },
+  sectionTitle: {
+    fontSize: "18px",
+    fontWeight: 800,
+    color: "#1e293b",
+    marginBottom: "20px",
+  },
+  actionsRow: { display: "flex", gap: "16px", flexWrap: "wrap" },
+  primaryAction: {
+    padding: "14px 28px",
+    background: "#4338ca",
     color: "#fff",
     border: "none",
-    borderRadius: 8,
+    borderRadius: "14px",
+    fontWeight: 700,
     cursor: "pointer",
-    fontWeight: 600,
+    boxShadow: "0 10px 15px -3px rgba(67, 56, 202, 0.3)",
+  },
+  secondaryAction: {
+    padding: "14px 28px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "none",
+    borderRadius: "14px",
+    fontWeight: 700,
+    cursor: "pointer",
   },
 };
+
+export default AdminDashboard;

@@ -5,8 +5,8 @@ import MainLayout from "./layout/MainLayout";
 
 /* PAGES */
 import Login from "./auth/pages/login";
-import UserLanding from "./user/landindpapge";
-import ProductList from "./user/productlist";
+import UserLanding from "./user/landing-Page";
+import ProductList from "./user/product-List";
 import ProductDetail from "./user/productDetail";
 import Cart from "./user/cart";
 import Checkout from "./user/chekout";

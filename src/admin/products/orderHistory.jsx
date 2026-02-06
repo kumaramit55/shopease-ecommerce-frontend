@@ -1,27 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
-/* ================= STATUS STYLES ================= */
+/* ================= STATUS THEMES ================= */
 const statusStyles = {
-  PLACED: {
-    background: "#e0e7ff",
-    color: "#1d4ed8",
-    borderColor: "#c7d2fe",
-  },
+  PLACED: { background: "#e0e7ff", color: "#4338ca", borderColor: "#c7d2fe" },
   CONFIRMED: {
-    background: "#fff7ed",
-    color: "#c2410c",
-    borderColor: "#fed7aa",
+    background: "#fef3c7",
+    color: "#b45309",
+    borderColor: "#fde68a",
   },
-  SHIPPED: {
-    background: "#ecfeff",
-    color: "#0f766e",
-    borderColor: "#99f6e4",
-  },
+  SHIPPED: { background: "#e0f2fe", color: "#0369a1", borderColor: "#bae6fd" },
   DELIVERED: {
-    background: "#ecfdf5",
-    color: "#047857",
-    borderColor: "#a7f3d0",
+    background: "#dcfce7",
+    color: "#15803d",
+    borderColor: "#bbf7d0",
   },
   CANCELLED: {
     background: "#fee2e2",
@@ -31,183 +23,239 @@ const statusStyles = {
 };
 
 const AdminOrders = () => {
-  const [orders, setOrders] = useState([]);
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  const [orders, setOrders] = useState(() => {
+    const storedOrders = JSON.parse(localStorage.getItem("app_orders")) || [];
+    return [...storedOrders].reverse();
+  });
 
   useEffect(() => {
-    const storedOrders = JSON.parse(localStorage.getItem("app_orders")) || [];
-    setOrders(storedOrders.reverse());
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+
+    // Clean up only the event listener here
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const updateStatus = (orderId, newStatus) => {
-    const updatedOrders = orders.map((order) =>
+    // 1. Update local state for immediate UI feel
+    const updatedDisplayOrders = orders.map((order) =>
       order.orderId === orderId ? { ...order, status: newStatus } : order,
     );
+    setOrders(updatedDisplayOrders);
 
-    setOrders(updatedOrders);
-    localStorage.setItem(
-      "app_orders",
-      JSON.stringify(updatedOrders.slice().reverse()),
-    );
+    // 2. Sync back to localStorage (reverse back to keep original order if needed)
+    const syncData = [...updatedDisplayOrders].reverse();
+    localStorage.setItem("app_orders", JSON.stringify(syncData));
   };
-
-  if (orders.length === 0) {
-    return (
-      <div style={styles.empty}>
-        <h2>No Orders Found</h2>
-        <button style={styles.backBtn} onClick={() => navigate("/admin")}>
-          ← Back to Dashboard
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div style={styles.page}>
-      {/* TOP BAR */}
-      <div style={styles.topBar}>
-        <button style={styles.backBtn} onClick={() => navigate("/admin")}>
-          ← Back to Dashboard
-        </button>
+      {/* HEADER SECTION */}
+      <div style={styles.header}>
+        <div>
+          <button style={styles.backBtn} onClick={() => navigate("/admin")}>
+            ← Dashboard
+          </button>
+          <h2 style={styles.title}>Order Management</h2>
+          <p style={styles.subTitle}>Track and update customer shipments</p>
+        </div>
+        {!isMobile && (
+          <div style={styles.statsMini}>
+            <strong>{orders.length}</strong> Total Orders
+          </div>
+        )}
       </div>
 
-      <h2 style={styles.title}>All Orders</h2>
-
-      <div style={styles.tableWrapper}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Order ID</th>
-              <th style={styles.th}>User</th>
-              <th style={styles.th}>Total</th>
-              <th style={styles.th}>Payment</th>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Date</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {orders.map((order) => (
-              <tr
-                key={order.orderId}
-                style={styles.row}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#fafbff")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }>
-                <td style={styles.td}>{order.orderId}</td>
-                <td style={styles.td}>{order.userName}</td>
-                <td style={styles.td}>₹{order.totalAmount.toFixed(2)}</td>
-                <td style={styles.td}>{order.paymentMethod}</td>
-
-                <td style={styles.td}>
-                  <select
-                    value={order.status}
-                    onChange={(e) =>
-                      updateStatus(order.orderId, e.target.value)
-                    }
-                    style={{
-                      ...styles.select,
-                      ...statusStyles[order.status],
-                    }}>
-                    <option value="PLACED">Placed</option>
-                    <option value="CONFIRMED">Confirmed</option>
-                    <option value="SHIPPED">Shipped</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
-                </td>
-
-                <td style={styles.td}>{order.createdAt}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {orders.length === 0 ?
+        <div style={styles.emptyCard}>
+          <div style={{ fontSize: "50px" }}>📦</div>
+          <h3 style={{ margin: "10px 0" }}>No orders yet</h3>
+          <p style={{ color: "#64748b", marginBottom: "20px" }}>
+            When customers buy products, they will appear here.
+          </p>
+          <button style={styles.primaryBtn} onClick={() => navigate("/")}>
+            Go to Store
+          </button>
+        </div>
+      : <div style={styles.tableCard}>
+          <div style={styles.tableResponsive}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Order Details</th>
+                  <th style={styles.th}>Customer</th>
+                  <th style={styles.th}>Amount</th>
+                  <th style={styles.th}>Payment</th>
+                  <th style={styles.th}>Status Action</th>
+                  <th style={styles.th}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.orderId} style={styles.row}>
+                    <td style={styles.td}>
+                      <span style={styles.orderId}>
+                        #{order.orderId.slice(-6)}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      <div style={styles.userName}>{order.userName}</div>
+                    </td>
+                    <td style={styles.td}>
+                      <span style={styles.amount}>
+                        ₹{order.totalAmount.toLocaleString()}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      <span style={styles.methodBadge}>
+                        {order.paymentMethod}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      <select
+                        value={order.status}
+                        onChange={(e) =>
+                          updateStatus(order.orderId, e.target.value)
+                        }
+                        style={{
+                          ...styles.statusSelect,
+                          ...statusStyles[order.status],
+                        }}>
+                        <option value="PLACED">Placed</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </td>
+                    <td style={styles.td}>
+                      <div style={styles.dateText}>
+                        {new Date(order.createdAt).toLocaleDateString()}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
     </div>
   );
 };
 
-export default AdminOrders;
-
-/* ================= STYLES ================= */
+/* ================= PREMIUM STYLES ================= */
 
 const styles = {
   page: {
-    padding: 24,
-    background: "#f4f6f8",
+    padding: "40px 24px",
+    background: "#f8fafc",
     minHeight: "100vh",
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
   },
-
-  topBar: {
-    marginBottom: 12,
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: "32px",
   },
-
   backBtn: {
     background: "transparent",
     border: "none",
-    color: "#1d2671",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  title: {
-    marginBottom: 20,
+    color: "#6366f1",
+    fontSize: "13px",
     fontWeight: 700,
+    cursor: "pointer",
+    padding: 0,
+    marginBottom: "8px",
+  },
+  title: { fontSize: "28px", fontWeight: 800, color: "#1e293b", margin: 0 },
+  subTitle: { color: "#64748b", margin: "4px 0 0", fontSize: "14px" },
+  statsMini: {
+    background: "#fff",
+    padding: "10px 20px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    fontSize: "14px",
+    color: "#475569",
   },
 
-  tableWrapper: {
+  tableCard: {
     background: "#fff",
-    borderRadius: 12,
-    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+    borderRadius: "20px",
+    border: "1px solid #f1f5f9",
+    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
     overflow: "hidden",
   },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
-
+  tableResponsive: { overflowX: "auto" },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: "900px" },
   th: {
-    padding: "14px 16px",
-    background: "#f8f9fb",
     textAlign: "left",
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#555",
+    padding: "16px 24px",
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#94a3b8",
+    background: "#fafafa",
+    textTransform: "uppercase",
+    borderBottom: "1px solid #f1f5f9",
   },
-
   td: {
-    padding: "14px 16px",
-    borderTop: "1px solid #eee",
-    fontSize: 14,
+    padding: "18px 24px",
+    borderBottom: "1px solid #f8fafc",
+    verticalAlign: "middle",
+  },
+  row: { transition: "0.2s" },
+
+  orderId: {
+    fontWeight: 700,
+    color: "#1e293b",
+    fontFamily: "monospace",
+    fontSize: "15px",
+  },
+  userName: { fontWeight: 600, color: "#475569", fontSize: "14px" },
+  amount: { fontWeight: 800, color: "#1e293b" },
+  methodBadge: {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#64748b",
+    background: "#f1f5f9",
+    padding: "4px 8px",
+    borderRadius: "6px",
   },
 
-  row: {
-    transition: "background 0.2s",
-  },
-
-  select: {
-    padding: "6px 12px",
-    borderRadius: 999,
+  statusSelect: {
+    padding: "8px 12px",
+    borderRadius: "10px",
     border: "1px solid",
-    fontSize: 12,
-    fontWeight: 600,
+    fontSize: "12px",
+    fontWeight: 700,
     cursor: "pointer",
     outline: "none",
+    appearance: "none", // Removes default arrow for cleaner look
+    textAlign: "center",
   },
 
-  empty: {
-    height: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-    background: "#f4f6f8",
+  dateText: { fontSize: "13px", color: "#94a3b8", fontWeight: 500 },
+
+  emptyCard: {
+    background: "#fff",
+    padding: "60px",
+    borderRadius: "24px",
+    textAlign: "center",
+    border: "1px solid #f1f5f9",
+  },
+  primaryBtn: {
+    background: "#1e293b",
+    color: "#fff",
+    border: "none",
+    padding: "12px 24px",
+    borderRadius: "12px",
+    fontWeight: 700,
+    cursor: "pointer",
   },
 };
+
+export default AdminOrders;

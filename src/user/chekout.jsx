@@ -1,19 +1,22 @@
 import { useNavigate, useLocation } from "react-router";
 import { useCart } from "../auth/store/cartContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const Checkout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cart, totalAmount, clearCart } = useCart();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 850);
 
-  // 🔹 Buy Now item (if exists)
+  // Responsive listener
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const buyNowItem = location.state?.buyNowItem;
-
-  // 🔹 Decide checkout items
   const checkoutItems = buyNowItem ? [buyNowItem] : cart;
-
-  // 🔹 Decide total
   const checkoutTotal =
     buyNowItem ? buyNowItem.price * buyNowItem.qty : totalAmount;
 
@@ -31,63 +34,40 @@ const Checkout = () => {
 
   const placeOrder = () => {
     if (!form.name || !form.address || !form.city || !form.pincode) {
-      alert("Please fill all address details");
+      alert("Please fill all shipping details to proceed.");
       return;
     }
 
-    // 🔹 Get existing orders
     const existingOrders = JSON.parse(localStorage.getItem("app_orders")) || [];
-
-    // 🔹 Create new order
     const newOrder = {
       orderId: "ORD_" + Date.now(),
-      userId: "USR_101", // 🔐 logged-in user
       userName: form.name,
-
-      items: checkoutItems.map((item) => ({
-        productId: item.id,
-        name: item.title,
-        price: item.price,
-        qty: item.qty,
-        image: item.image,
-      })),
-
-      shippingAddress: {
-        address: form.address,
-        city: form.city,
-        pincode: form.pincode,
-      },
-
+      items: checkoutItems,
+      shippingAddress: { ...form },
       totalAmount: checkoutTotal,
       paymentMethod: form.payment,
       status: "PLACED",
       createdAt: new Date().toLocaleString(),
     };
 
-    // 🔹 Save order
     existingOrders.push(newOrder);
     localStorage.setItem("app_orders", JSON.stringify(existingOrders));
 
-    // 🔹 Clear cart only if not buy-now
-    if (!buyNowItem) {
-      clearCart();
-    }
+    if (!buyNowItem) clearCart();
 
-    // 🔹 Navigate
-    navigate("/order-success", {
-      state: { orderId: newOrder.orderId },
-    });
+    navigate("/order-success", { state: { orderId: newOrder.orderId } });
   };
 
-  // 🔴 If nothing to checkout
   if (checkoutItems.length === 0) {
     return (
-      <div style={styles.empty}>
-        <h2 style={styles.emptyTitle}>Nothing to checkout</h2>
+      <div style={styles.emptyContainer}>
+        <h2 style={styles.emptyTitle}>Your bag is empty</h2>
         <p style={styles.emptyText}>
-          Your cart is empty. Add products to continue.
+          Add some items to your bag to proceed with checkout.
         </p>
-        <button style={styles.primaryBtn} onClick={() => navigate("/products")}>
+        <button
+          style={styles.continueBtn}
+          onClick={() => navigate("/products")}>
           Go Shopping
         </button>
       </div>
@@ -96,81 +76,145 @@ const Checkout = () => {
 
   return (
     <div style={styles.page}>
-      {/* HEADER */}
-
       <div style={styles.container}>
-        <h3 style={styles.pageTitle}>Checkout</h3>
+        <div style={styles.header}>
+          <h2 style={styles.pageTitle}>Secure Checkout</h2>
+          <p style={styles.subtitle}>
+            Finalize your order and choose your preferred delivery address
+          </p>
+        </div>
 
-        <div style={styles.layout}>
-          {/* LEFT : ADDRESS */}
-          <div style={styles.card}>
-            <h4>Shipping Address</h4>
-
-            <input
-              name="name"
-              placeholder="Full Name"
-              style={styles.input}
-              value={form.name}
-              onChange={handleChange}
-            />
-            <textarea
-              name="address"
-              placeholder="Address"
-              style={styles.textarea}
-              value={form.address}
-              onChange={handleChange}
-            />
-            <input
-              name="city"
-              placeholder="City"
-              style={styles.input}
-              value={form.city}
-              onChange={handleChange}
-            />
-            <input
-              name="pincode"
-              placeholder="Pincode"
-              style={styles.input}
-              value={form.pincode}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* RIGHT : SUMMARY */}
-          <div style={styles.summary}>
-            <h4>Order Summary</h4>
-
-            {checkoutItems.map((item) => (
-              <div key={item.id} style={styles.summaryItem}>
-                <span>
-                  {item.title.slice(0, 25)} × {item.qty}
-                </span>
-                <span>₹ {Math.round(item.price * item.qty * 80)}</span>
+        <div
+          style={{
+            ...styles.layout,
+            gridTemplateColumns: isMobile ? "1fr" : "1.6fr 1fr",
+          }}>
+          {/* LEFT: SHIPPING DETAILS */}
+          <div style={styles.formCard}>
+            <h3 style={styles.cardHeading}>Shipping Information</h3>
+            <div style={styles.formGrid}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Full Name</label>
+                <input
+                  name="name"
+                  placeholder="e.g. John Doe"
+                  style={styles.input}
+                  value={form.name}
+                  onChange={handleChange}
+                />
               </div>
-            ))}
-
-            <hr />
-
-            <div style={styles.summaryTotal}>
-              <span>Total</span>
-              <span>₹ {Math.round(checkoutTotal * 80)}</span>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Detailed Address</label>
+                <textarea
+                  name="address"
+                  placeholder="Street, Apartment, Suite..."
+                  style={styles.textarea}
+                  value={form.address}
+                  onChange={handleChange}
+                />
+              </div>
+              <div style={styles.row}>
+                <div style={{ flex: 1 }}>
+                  <label style={styles.label}>City</label>
+                  <input
+                    name="city"
+                    placeholder="City"
+                    style={styles.input}
+                    value={form.city}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={styles.label}>Pincode</label>
+                  <input
+                    name="pincode"
+                    placeholder="6-digit code"
+                    style={styles.input}
+                    value={form.pincode}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
             </div>
 
-            <h4 style={{ marginTop: 20 }}>Payment Method</h4>
+            <h3 style={{ ...styles.cardHeading, marginTop: "40px" }}>
+              Payment Method
+            </h3>
+            <div style={styles.paymentGrid}>
+              {["COD", "CARD", "UPI"].map((method) => (
+                <div
+                  key={method}
+                  onClick={() => setForm({ ...form, payment: method })}
+                  style={{
+                    ...styles.paymentOption,
+                    borderColor:
+                      form.payment === method ? "#4338ca" : "#e2e8f0",
+                    background: form.payment === method ? "#f5f3ff" : "#fff",
+                  }}>
+                  <div
+                    style={{
+                      ...styles.radio,
+                      borderColor:
+                        form.payment === method ? "#4338ca" : "#cbd5e1",
+                    }}>
+                    {form.payment === method && (
+                      <div style={styles.radioInner} />
+                    )}
+                  </div>
+                  <span style={styles.paymentText}>
+                    {method === "COD" ?
+                      "Cash on Delivery"
+                    : method === "CARD" ?
+                      "Card Payment"
+                    : "UPI Payment"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-            <select
-              name="payment"
-              value={form.payment}
-              onChange={handleChange}
-              style={styles.input}>
-              <option value="COD">Cash on Delivery</option>
-              <option value="CARD">Credit / Debit Card</option>
-              <option value="UPI">UPI</option>
-            </select>
+          {/* RIGHT: SUMMARY */}
+          <div style={styles.summaryContainer}>
+            <div style={styles.summaryCard}>
+              <h3 style={styles.cardHeading}>Order Summary</h3>
+              <div style={styles.itemsList}>
+                {checkoutItems.map((item) => (
+                  <div key={item.id} style={styles.summaryItem}>
+                    <div style={styles.itemMeta}>
+                      <span style={styles.itemTitle}>{item.title}</span>
+                      <span style={styles.itemQty}>Qty: {item.qty}</span>
+                    </div>
+                    <span style={styles.itemPrice}>
+                      ${Math.round(item.price * item.qty)}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-            <button style={styles.checkoutBtn} onClick={placeOrder}>
-              Place Order
-            </button>
+              <div style={styles.divider} />
+
+              <div style={styles.summaryRow}>
+                <span>Subtotal</span>
+                <span>${Math.round(checkoutTotal)}</span>
+              </div>
+              <div style={styles.summaryRow}>
+                <span>Shipping</span>
+                <span style={{ color: "#10b981", fontWeight: 700 }}>FREE</span>
+              </div>
+
+              <div style={styles.totalRow}>
+                <span>Total Amount</span>
+                <span>${Math.round(checkoutTotal)}</span>
+              </div>
+
+              <button style={styles.placeOrderBtn} onClick={placeOrder}>
+                Complete Purchase
+              </button>
+
+              <p style={styles.secureText}>
+                🔒 All transactions are encrypted and secure
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -178,144 +222,169 @@ const Checkout = () => {
   );
 };
 
-export default Checkout;
-
-/* ================= STYLES ================= */
+/* ================= THEMED STYLES ================= */
 
 const styles = {
-  /* ===== PAGE ===== */
   page: {
+    background: "#f8fafc",
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #eef2f7, #f8fafc)",
-    fontFamily: "'Inter', system-ui, sans-serif",
+    paddingTop: "120px",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
   },
+  container: { maxWidth: 1200, margin: "0 auto", padding: "0 24px 60px" },
+  header: { marginBottom: "40px" },
+  pageTitle: { fontSize: "32px", fontWeight: 800, color: "#1e293b", margin: 0 },
+  subtitle: { color: "#64748b", marginTop: "8px" },
+  layout: { display: "grid", gap: "40px", alignItems: "start" },
 
-  container: {
-    maxWidth: 1100,
-    margin: "0 auto",
-    padding: "28px 20px",
+  /* FORMS */
+  formCard: {
+    background: "#fff",
+    padding: "32px",
+    borderRadius: "24px",
+    border: "1px solid #f1f5f9",
+    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
   },
-
-  pageTitle: {
-    fontSize: 26,
+  cardHeading: {
+    fontSize: "18px",
     fontWeight: 700,
-    marginBottom: 24,
-    color: "#111827",
+    color: "#1e293b",
+    marginBottom: "20px",
   },
-
-  /* ===== LAYOUT ===== */
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "2fr 1fr",
-    gap: 30,
-  },
-
-  /* ===== LEFT : ADDRESS CARD ===== */
-  card: {
-    background: "#fff",
-    padding: 26,
-    borderRadius: 18,
-    boxShadow: "0 15px 30px rgba(0,0,0,0.08)",
-  },
-
+  formGrid: { display: "flex", flexDirection: "column", gap: "16px" },
+  inputGroup: { display: "flex", flexDirection: "column", gap: "6px" },
+  label: { fontSize: "13px", fontWeight: 700, color: "#64748b" },
   input: {
-    width: "100%",
-    padding: "12px 14px",
-    margin: "12px 0",
-    borderRadius: 10,
-    border: "1px solid #d1d5db",
-    fontSize: 14,
+    padding: "14px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    fontSize: "15px",
     outline: "none",
+    transition: "border 0.2s",
   },
-
   textarea: {
-    width: "100%",
-    padding: "12px 14px",
-    margin: "12px 0",
-    borderRadius: 10,
-    border: "1px solid #d1d5db",
-    minHeight: 90,
-    fontSize: 14,
-    resize: "none",
+    padding: "14px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    fontSize: "15px",
+    minHeight: "80px",
     outline: "none",
+    fontFamily: "inherit",
   },
+  row: { display: "flex", gap: "16px" },
 
-  /* ===== RIGHT : SUMMARY ===== */
-  summary: {
+  /* PAYMENT */
+  paymentGrid: { display: "flex", flexDirection: "column", gap: "12px" },
+  paymentOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "16px",
+    borderRadius: "14px",
+    border: "2px solid",
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  radio: {
+    width: "20px",
+    height: "20px",
+    borderRadius: "50%",
+    border: "2px solid",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioInner: {
+    width: "10px",
+    height: "10px",
+    borderRadius: "50%",
+    background: "#4338ca",
+  },
+  paymentText: { fontWeight: 600, fontSize: "15px", color: "#1e293b" },
+
+  /* SUMMARY */
+  summaryContainer: { position: "sticky", top: "120px" },
+  summaryCard: {
     background: "#fff",
-    padding: 26,
-    borderRadius: 18,
-    boxShadow: "0 20px 35px rgba(0,0,0,0.1)",
-    height: "fit-content",
-    position: "sticky",
-    top: 20,
+    padding: "32px",
+    borderRadius: "24px",
+    border: "1px solid #f1f5f9",
+    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.05)",
   },
-
+  itemsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+    marginBottom: "20px",
+  },
   summaryItem: {
     display: "flex",
     justifyContent: "space-between",
-    margin: "10px 0",
-    fontSize: 14,
-    color: "#374151",
+    alignItems: "center",
   },
-
-  summaryTotal: {
+  itemMeta: { display: "flex", flexDirection: "column" },
+  itemTitle: { fontSize: "14px", fontWeight: 600, color: "#1e293b" },
+  itemQty: { fontSize: "12px", color: "#94a3b8" },
+  itemPrice: { fontWeight: 700, color: "#1e293b" },
+  divider: { height: "1px", background: "#f1f5f9", margin: "20px 0" },
+  summaryRow: {
     display: "flex",
     justifyContent: "space-between",
-    fontWeight: 800,
-    fontSize: 16,
-    marginTop: 16,
-    color: "#111827",
+    marginBottom: "12px",
+    fontSize: "14px",
+    color: "#64748b",
   },
-
-  checkoutBtn: {
+  totalRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: "20px",
+    fontWeight: 800,
+    color: "#1e293b",
+    marginTop: "16px",
+  },
+  placeOrderBtn: {
     width: "100%",
-    padding: "14px",
-    marginTop: 24,
-    background: "#1d2671",
+    padding: "18px",
+    background: "#4338ca",
     color: "#fff",
     border: "none",
-    borderRadius: 14,
-    cursor: "pointer",
+    borderRadius: "16px",
     fontWeight: 700,
-    fontSize: 16,
-    boxShadow: "0 12px 22px rgba(29,38,113,0.35)",
+    fontSize: "16px",
+    cursor: "pointer",
+    marginTop: "30px",
+    boxShadow: "0 10px 15px -3px rgba(67, 56, 202, 0.3)",
+  },
+  secureText: {
+    textAlign: "center",
+    fontSize: "12px",
+    color: "#94a3b8",
+    marginTop: "16px",
+    fontWeight: 600,
   },
 
-  /* ===== EMPTY CHECKOUT ===== */
-  empty: {
+  /* EMPTY STATE */
+  emptyContainer: {
     height: "100vh",
     display: "flex",
     flexDirection: "column",
-    justifyContent: "center",
     alignItems: "center",
-    gap: 14,
-    background: "linear-gradient(135deg, #eef2f7, #f8fafc)",
+    justifyContent: "center",
+    background: "#f8fafc",
+    padding: "24px",
     textAlign: "center",
   },
-
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 700,
-    color: "#111827",
-  },
-
-  emptyText: {
-    fontSize: 15,
-    color: "#6b7280",
-    maxWidth: 300,
-  },
-
-  primaryBtn: {
-    marginTop: 10,
-    padding: "12px 26px",
-    background: "#1d2671",
+  emptyTitle: { fontSize: "28px", fontWeight: 800, color: "#1e293b" },
+  emptyText: { color: "#64748b", margin: "12px 0 24px" },
+  continueBtn: {
+    padding: "14px 28px",
+    background: "#1e293b",
     color: "#fff",
     border: "none",
-    borderRadius: 12,
-    cursor: "pointer",
+    borderRadius: "12px",
     fontWeight: 700,
-    fontSize: 15,
-    boxShadow: "0 10px 20px rgba(29,38,113,0.3)",
+    cursor: "pointer",
   },
 };
+
+export default Checkout;

@@ -20,7 +20,6 @@ const MyOrders = () => {
   useEffect(() => {
     const fetchOrders = () => {
       const allOrders = loadOrders();
-
       const myOrders = allOrders
         .filter((order) => order.userId === loggedInUserId)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

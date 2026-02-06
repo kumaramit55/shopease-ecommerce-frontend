@@ -9,39 +9,65 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImg, setActiveImg] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 850);
+
+  // Handle responsiveness
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
-    fetch(`https://dummyjson.com/products/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`https://dummyjson.com/products/${id}`);
+
+        if (!response.ok) {
+          throw new Error("Product not found");
+        }
+
+        const data = await response.json();
         setProduct(data);
         setActiveImg(data.thumbnail);
-        setLoading(false);
-      });
+      } catch (error) {
+        console.error("Error fetching product:", error);
+        setProduct(null); // Clear product state on error
+      } finally {
+        setLoading(false); // This will run no matter what happens
+      }
+    };
+
+    fetchProduct();
   }, [id]);
 
-  if (loading) {
-    return <div style={styles.loader}>Loading product...</div>;
-  }
-
-  if (!product) {
-    return <div style={styles.loader}>Product not found</div>;
-  }
+  if (loading)
+    return <div style={styles.loader}>✨ Polishing your selection...</div>;
+  if (!product) return <div style={styles.loader}>Product not found</div>;
 
   return (
     <div style={styles.page}>
-      {/* ===== HEADER ===== */}
-
-      {/* ===== CONTENT ===== */}
       <div style={styles.container}>
+        {/* BREADCRUMB / BACK */}
         <button style={styles.backBtn} onClick={() => navigate(-1)}>
-          ← Back
+          ← Back to Marketplace
         </button>
 
-        <div style={styles.detailGrid}>
-          {/* IMAGE SECTION */}
+        <div
+          style={{
+            ...styles.detailGrid,
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            padding: isMobile ? "20px" : "40px",
+          }}>
+          {/* LEFT: IMAGE GALLERY */}
           <div style={styles.imageSection}>
             <div style={styles.mainImageBox}>
+              {product.discountPercentage > 0 && (
+                <div style={styles.promoBadge}>
+                  -{Math.round(product.discountPercentage)}% OFF
+                </div>
+              )}
               <img
                 src={activeImg}
                 alt={product.title}
@@ -51,64 +77,93 @@ const ProductDetail = () => {
 
             <div style={styles.thumbnailRow}>
               {[product.thumbnail, ...(product.images || [])]
-                .slice(0, 4)
+                .filter((img, index, self) => self.indexOf(img) === index) // Unique images only
+                .slice(0, 5)
                 .map((img, i) => (
-                  <img
+                  <div
                     key={i}
-                    src={img}
-                    alt="thumb"
-                    style={{
-                      ...styles.thumbnail,
-                      border:
-                        activeImg === img ? "2px solid #1d2671" : (
-                          "1px solid #ccc"
-                        ),
-                    }}
                     onClick={() => setActiveImg(img)}
-                  />
+                    style={{
+                      ...styles.thumbWrapper,
+                      borderColor: activeImg === img ? "#4338ca" : "#e2e8f0",
+                      transform: activeImg === img ? "scale(1.05)" : "scale(1)",
+                    }}>
+                    <img src={img} alt="thumb" style={styles.thumbnail} />
+                  </div>
                 ))}
             </div>
           </div>
 
-          {/* INFO SECTION */}
+          {/* RIGHT: CONTENT SECTION */}
           <div style={styles.infoSection}>
+            <div style={styles.headerInfo}>
+              <span style={styles.categoryTag}>{product.category}</span>
+              <span style={styles.ratingBox}>⭐ {product.rating}</span>
+            </div>
+
             <h1 style={styles.title}>{product.title}</h1>
-            <p style={styles.brand}>Brand: {product.brand}</p>
-
-            <p style={styles.price}>₹ {Math.round(product.price * 80)}</p>
-
-            <p style={styles.rating}>⭐ {product.rating} / 5</p>
-
-            <p style={styles.desc}>{product.description}</p>
-
-            <p style={styles.stock}>
-              {product.stock > 0 ? "In Stock" : "Out of Stock"}
+            <p style={styles.brandText}>
+              By{" "}
+              <span style={{ color: "#4338ca", fontWeight: 700 }}>
+                {product.brand || "ShopEase Elite"}
+              </span>
             </p>
 
-            <div style={styles.actions}>
+            <div style={styles.priceContainer}>
+              <h2 style={styles.price}>${product.price}</h2>
+              <span style={styles.originalPrice}>
+                ${Math.round(product.price * 1.2)}
+              </span>
+            </div>
+
+            <p style={styles.description}>{product.description}</p>
+
+            <div style={styles.statusRow}>
+              <div
+                style={{
+                  ...styles.stockIndicator,
+                  background: product.stock > 0 ? "#dcfce7" : "#fee2e2",
+                  color: product.stock > 0 ? "#15803d" : "#ef4444",
+                }}>
+                {product.stock > 0 ?
+                  `● In Stock (${product.stock})`
+                : "○ Out of Stock"}
+              </div>
+            </div>
+
+            <div style={styles.divider} />
+
+            {/* CTA ACTIONS */}
+            <div
+              style={{
+                ...styles.actions,
+                flexDirection: isMobile ? "column" : "row",
+              }}>
               <button
                 style={styles.primaryBtn}
                 onClick={() => {
                   addToCart(product);
-                  navigate("/cart");
+                  navigate("/cart"); // Uncomment if you want immediate redirect
                 }}>
-                🛒 Add to Cart
+                Add to Cart
               </button>
 
               <button
                 style={styles.secondaryBtn}
-                onClick={() => {
+                onClick={() =>
                   navigate("/checkout", {
-                    state: {
-                      buyNowItem: {
-                        ...product,
-                        qty: 1,
-                      },
-                    },
-                  });
-                }}>
-                ⚡ Buy Now
+                    state: { buyNowItem: { ...product, qty: 1 } },
+                  })
+                }>
+                Buy Now
               </button>
+            </div>
+
+            {/* TRUST BADGES */}
+            <div style={styles.trustGrid}>
+              <div style={styles.trustItem}>✅ Authentic Product</div>
+              <div style={styles.trustItem}>🚚 Free Delivery</div>
+              <div style={styles.trustItem}>🔄 30-Day Return</div>
             </div>
           </div>
         </div>
@@ -117,166 +172,213 @@ const ProductDetail = () => {
   );
 };
 
-export default ProductDetail;
-
 /* ================= STYLES ================= */
 
 const styles = {
-  /* ===== PAGE ===== */
   page: {
-    background: "linear-gradient(135deg, #eef2f7, #f8fafc)",
+    background: "#f8fafc",
     minHeight: "100vh",
-    fontFamily: "'Inter', system-ui, sans-serif",
+    paddingTop: "100px",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
   },
-
   loader: {
     height: "100vh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 18,
-    fontWeight: 500,
+    fontSize: "20px",
+    fontWeight: 700,
+    color: "#4338ca",
   },
-
   container: {
     maxWidth: 1200,
     margin: "0 auto",
-    padding: "24px",
+    padding: "0 20px 60px",
   },
-
   backBtn: {
-    background: "transparent",
+    background: "none",
     border: "none",
-    color: "#1d2671",
+    color: "#64748b",
     cursor: "pointer",
-    marginBottom: 20,
-    fontSize: 15,
+    marginBottom: "24px",
+    fontSize: "14px",
     fontWeight: 600,
+    transition: "color 0.2s",
   },
-
-  /* ===== PRODUCT CARD ===== */
   detailGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 40,
+    gap: "50px",
     background: "#fff",
-    padding: 40,
-    borderRadius: 16,
-    boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+    borderRadius: "32px",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.05)",
+    border: "1px solid #f1f5f9",
   },
 
-  /* ===== IMAGE SECTION ===== */
-  imageSection: {},
-
+  /* IMAGE GALLERY */
   mainImageBox: {
-    height: 420,
-    background: "#f8f9fb",
-    borderRadius: 16,
+    height: "450px",
+    background: "#fcfcfd",
+    borderRadius: "24px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    position: "relative",
+    overflow: "hidden",
+    border: "1px solid #f1f5f9",
   },
-
   mainImage: {
-    maxHeight: "90%",
-    maxWidth: "90%",
+    maxHeight: "85%",
+    maxWidth: "85%",
     objectFit: "contain",
-    transition: "transform 0.3s ease",
   },
-
+  promoBadge: {
+    position: "absolute",
+    top: "20px",
+    left: "20px",
+    background: "#ef4444",
+    color: "#fff",
+    padding: "6px 14px",
+    borderRadius: "10px",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
   thumbnailRow: {
     display: "flex",
-    gap: 12,
+    gap: "12px",
+    marginTop: "20px",
+    justifyContent: "center",
   },
-
-  thumbnail: {
-    width: 72,
-    height: 72,
-    objectFit: "contain",
+  thumbWrapper: {
+    width: "70px",
+    height: "70px",
+    borderRadius: "14px",
+    padding: "4px",
+    border: "2px solid transparent",
     cursor: "pointer",
-    padding: 6,
-    borderRadius: 10,
     background: "#fff",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
+    transition: "all 0.2s ease",
+  },
+  thumbnail: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
   },
 
-  /* ===== INFO SECTION ===== */
-  infoSection: {},
-
+  /* CONTENT SECTION */
+  headerInfo: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
+  },
+  categoryTag: {
+    textTransform: "uppercase",
+    fontSize: "11px",
+    fontWeight: 800,
+    color: "#94a3b8",
+    letterSpacing: "1px",
+  },
+  ratingBox: {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#f59e0b",
+    background: "#fffbeb",
+    padding: "4px 10px",
+    borderRadius: "8px",
+  },
   title: {
-    fontSize: 28,
-    fontWeight: 700,
-    marginBottom: 6,
-    color: "#111827",
+    fontSize: "36px",
+    fontWeight: 800,
+    color: "#1e293b",
+    margin: "0 0 8px 0",
+    lineHeight: "1.2",
   },
-
-  brand: {
-    color: "#6b7280",
-    fontSize: 14,
-    marginBottom: 14,
+  brandText: {
+    fontSize: "16px",
+    color: "#64748b",
+    margin: "0 0 24px 0",
   },
-
+  priceContainer: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "12px",
+    marginBottom: "20px",
+  },
   price: {
-    fontSize: 26,
-    fontWeight: 700,
-    color: "#1d2671",
-    marginBottom: 8,
+    fontSize: "36px",
+    fontWeight: 800,
+    color: "#1e293b",
+    margin: 0,
   },
-
-  rating: {
+  originalPrice: {
+    fontSize: "18px",
+    color: "#94a3b8",
+    textDecoration: "line-through",
+  },
+  description: {
+    fontSize: "16px",
+    lineHeight: "1.7",
+    color: "#475569",
+    marginBottom: "30px",
+  },
+  statusRow: {
+    marginBottom: "30px",
+  },
+  stockIndicator: {
     display: "inline-block",
-    background: "#e0f2fe",
-    color: "#0369a1",
-    padding: "4px 12px",
-    borderRadius: 20,
-    fontSize: 14,
-    marginBottom: 16,
-    fontWeight: 600,
-  },
-
-  desc: {
-    color: "#374151",
-    fontSize: 15,
-    lineHeight: 1.6,
-    marginBottom: 20,
-  },
-
-  stock: {
+    padding: "6px 14px",
+    borderRadius: "10px",
+    fontSize: "13px",
     fontWeight: 700,
-    color: "#15803d",
-    marginBottom: 24,
   },
-
-  /* ===== ACTION BUTTONS ===== */
+  divider: {
+    height: "1px",
+    background: "#f1f5f9",
+    marginBottom: "30px",
+  },
   actions: {
     display: "flex",
-    gap: 16,
-    marginTop: 10,
+    gap: "16px",
+    marginBottom: "40px",
   },
-
   primaryBtn: {
     flex: 1,
-    padding: "14px 0",
-    background: "#1d2671",
+    padding: "18px",
+    background: "#1e293b",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
-    cursor: "pointer",
+    borderRadius: "16px",
     fontWeight: 700,
-    fontSize: 16,
-    boxShadow: "0 10px 20px rgba(29,38,113,0.3)",
+    fontSize: "16px",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
   },
-
   secondaryBtn: {
     flex: 1,
-    padding: "14px 0",
-    background: "#facc15",
-    color: "#000",
+    padding: "18px",
+    background: "#4338ca",
+    color: "#fff",
     border: "none",
-    borderRadius: 10,
-    cursor: "pointer",
+    borderRadius: "16px",
     fontWeight: 700,
-    fontSize: 16,
+    fontSize: "16px",
+    cursor: "pointer",
+    boxShadow: "0 10px 15px -3px rgba(67, 56, 202, 0.2)",
+  },
+  trustGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: "12px",
+    padding: "20px",
+    background: "#f8fafc",
+    borderRadius: "16px",
+  },
+  trustItem: {
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#64748b",
+    textAlign: "center",
   },
 };
+
+export default ProductDetail;
